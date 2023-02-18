@@ -1,3 +1,4 @@
+import os
 import requests
 import time
 import bs4
@@ -11,6 +12,8 @@ import time
 import warnings
 import uuid
 from requests_toolbelt import MultipartEncoder
+from decimal import Decimal
+import argparse
 
 # Algos used:
 # (gor1, dpm, gor3, phd, predator, hnn, mlrc, sopm, dsc) via PRABI, (JPred) via JPred, (prof, sspro, yaspin, JNet, PSIPRED, sympred) via Sympred
@@ -18,10 +21,10 @@ from requests_toolbelt import MultipartEncoder
 # Use conda environment called 'PyVkabat'
 # $ conda activate PyVkabat
 
-################################ Config Area ################################ 
+################################ Configuration Area ################################ 
 # all
-seq_name = "test_sequence_1"
-sequence = "NYLDLFSHKNMKLKERVLIPVKQYPKFNFVGKILGPQGNTIKRLQEETGAKISVLGKGSMRDKAKEEELRKGGDPKYAHLNMDLHVFIEVFGPPCEAYALMAHAMCEVKKFLVPDMMD"
+#seq_name = "test_sequence_1"
+#sequence = "NYLDLFSHKNMKLKERVLIPVKQYPKFNFVGKILGPQGNTIKRLQEETGAKISVLGKGSMRDKAKEEELRKGGDPKYAHLNMDLHVFIEVFGPPCEAYALMAHAMCEVKKFLVPDMMD"
 alignment_width = "100"
 
 # gor1
@@ -40,18 +43,78 @@ threshold = "8" # similarity threshold (default is 8)
 width = "17" # window width (default is 17)
 
 # JPred
-email = 'richard.pearson@sjsu.edu'
+email = ''
 skipPDB = True
 jpred_mode = "single" # options are single, batch, and msa
 jpred_user_format = "raw" # options are raw, fasta, msf, blc
 jpred_seq_or_file = "sequence" # options are sequence or file
 jpred_input_file = ''
 check_jpred_status = int(60) # Number of minutes to keep checking the status before giving up.
+
 #############################################################################
 
-prog_start_time = time.time()
-warnings.filterwarnings("ignore", category=UserWarning, module='bs4')
+def parse_arguments():
+	
+	parser = argparse.ArgumentParser(description='Calculates secondary structure variability (vkabat = k * N / n1) for each resiue in a protein sequence.')
+	
+	# positional arguments
+	parser.add_argument('sequence', metavar='<sequence>', type=str, help='Enter sequence (using 1 letter amino acid abbreviations)')
+	
+	# optional arguments
+	parser.add_argument('--name', metavar='<protein name>', type=str, help='Enter the name of the protein sequence or job name. This is a way to keep track of the submission and will affect the csv file names deposited in the project folder.')
+	parser.add_argument('--dir', metavar='<output directory path>', type=str, help='Enter the path to the output directory. This is where the output files will be sent.')
+	parser.add_argument('--email', metavar='<email>', type=str, help='Enter your email. Some servers will email you the results.')
+	parser.add_argument('--jpred_timeout', metavar='<time>', type=int, help='Enter the maximum allowable time for JPred data retreival in seconds.')
+	parser.add_argument('--yaspin_timeout', metavar='<time>', type=int, help='Enter the maximum allowable time for Yaspin data retreival in seconds.')
+	parser.add_argument('--sympred_timeout', metavar='<time>', type=int, help='Enter the maximum allowable time for Sympred data retreival in seconds.')
 
+	args = parser.parse_args()
+
+	# seq_name
+	global seq_name
+	if args.name == None:
+		seq_name = "test"
+	else:
+		seq_name = args.name
+	print(f'Sequence Name: {seq_name}')
+
+	# sequence
+	global sequence
+	sequence = args.sequence
+	print(f'Input Sequence: {sequence}')
+	print(f'Sequence length: {len(sequence)}')
+
+	# jpred_timeout
+	global jpred_timeout
+	if args.jpred_timeout == None:
+		jpred_timeout = 1300 # 30 minutes (1300 seconds)
+	else:
+		jpred_timeout = args.jpred_timeout
+	print(f'Maximum time allowed for JPred: {jpred_timeout} seconds.')
+
+	# yaspin_timeout
+	global yaspin_timeout
+	if args.yaspin_timeout == None:
+		yaspin_timeout = 1300 # 30 minutes (1300 seconds)
+	else:
+		yaspin_timeout = args.yaspin_timeout
+	print(f'Maximum time allowed for Yaspin: {yaspin_timeout} seconds.')
+
+	# sympred_timeout
+	global sympred_timeout
+	if args.sympred_timeout == None:
+		sympred_timeout = 1300 # 30 minutes (1300 seconds)
+	else:
+		sympred_timeout = args.sympred_timeout
+	print(f'Maximum time allowed for Sympred: {sympred_timeout} seconds.')
+
+	# output_directory
+	global output_directory
+	if args.dir == None:
+		output_directory = os.getcwd()
+	else:
+		output_directory = args.dir
+	print(f'Output Directory: {output_directory}')
 
 def runPrabi():
 	prabi_start_time = time.time()
@@ -156,8 +219,6 @@ def runPrabi():
 			out = future.result()
 			output.update(out)
 
-	#print(output)
-
 	prabi_end_time = time.time()
 	prabi_execution_time = prabi_end_time - prabi_start_time
 	print(f'PRABI algos took {prabi_execution_time} secs to complete.')
@@ -168,7 +229,6 @@ def run_alt_JPred():
 	alt_JPred_start_time = time.time()
 	
 	print('Running alt JPred (no API)')
-	
 
 	# Define the form data to be submitted
 	data = {
@@ -185,38 +245,25 @@ def run_alt_JPred():
 	# Set the headers for the request
 	headers = {
 		"Content-Type": multipart_data.content_type
-		# ~ "Content-Type": "multipart/form-data; boundary={}".format(boundary),
-		# ~ "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/109.0"
 	}
 	
-
 	# Define the URL of the JPred web form
 	url = 'https://www.compbio.dundee.ac.uk/jpred/cgi-bin/jpred_form'
 
 	# Submit the form data using a POST request
-	#response = requests.post(url, headers=headers, data=payload, allow_redirects=True)
 	response = requests.post(url, data=multipart_data, headers=headers)
-	#print(response.content)
-	
 	
 	soup = BeautifulSoup(response.text, features='html.parser')
-	#print(soup)
 	
-
 	output_list = []
 	for x in soup.find('div', {'id':'content'}).find('a'):
 		output_list.append(x.text)
-		
-	#print(output_list)
 	
 	job_id = output_list[0].split('chklog?')[-1]
-	#print(job_id)
-	
-	#print(response.status_code)	
 
 	# Check if the POST request was successful
 	if response.status_code == 200:
-		print(f'Job ID: {job_id}')
+		print(f'JPred Job ID: {job_id}')
 		
 		# Define the URL of the job results page
 		# Get result (not using the jpredapi)
@@ -224,9 +271,15 @@ def run_alt_JPred():
 		jpred_simple_result_url = (f'{jpred_result_base}/{job_id}/{job_id}.simple.html')
 
 		# Wait for the job to complete and the results to become available
-		print('Waiting for results...')
+		print('JPred: Waiting for results...')
 		
 		while True:
+			
+			# check elapsed time
+			if (time.time() - alt_JPred_start_time) > jpred_timeout:
+				print(f'JPred timed out. Exceeded {jpred_timeout} seconds.')
+				break
+			
 			# Send a GET request to the results page
 			results_page = requests.get(jpred_simple_result_url)
 				
@@ -270,13 +323,13 @@ def run_alt_JPred():
 				return out
 				break
 			else:
-				print(f'Request failed with status code {results_page.status_code}')
-				print(f'Aborting operation.')
+				print(f'JPred: Request failed with status code {results_page.status_code}')
+				print(f'JPred: Aborting operation.')
 				return None
 				break
 		
 	else:
-		print('Unable to get job ID')
+		print('JPred: Unable to get job ID')
 		return None
 
 def runJPred():
@@ -298,7 +351,7 @@ def runJPred():
 	else:
 		print('Something went wrong with the JPred submission. Check the jpred_seq_or_file variable.')
 		print(f'Currently, jpred_seq_or_file = {jpred_seq_or_file}. Valid options are "sequence" or "file"')
-		print('Aborting.')
+		print('Aborting JPred.')
 		return
 		
 	# get the job id of the submission
@@ -434,24 +487,28 @@ def runSympred5():
 	if response.status_code == 202:
 		# Extract the job ID from the redirect URL
 		job_id = response.url.split('/')[-2]
-		print(f'Job ID: {job_id}')
+		print(f'Sympred Job ID: {job_id}')
 		
 		# Define the URL of the job results page
 		results_url = f'http://zeus.few.vu.nl/jobs/{job_id}/result.hpred'
 
 		# Wait for the job to complete and the results to become available
-		print('Waiting for results...')
+		print('Sympred: Waiting for results...')
 		
 		while True:
+			
+			# check elapsed time
+			if (time.time() - sympred_start_time) > sympred_timeout:
+				print(f'Sympred timed out. Exceeded {sympred_timeout} seconds.')
+				break
+			
 			# Send a GET request to the results page
 			results_page = requests.get(results_url)
 				
 			if results_page.status_code == 202:
-				#print(f'Request failed with status code {results_page.status_code}')
 				sleep(5)
 				
 			elif results_page.status_code == 404:
-				#print(f'Request failed with status code {results_page.status_code}')
 				sleep(5)
 				
 			elif results_page.status_code == 200:
@@ -584,12 +641,12 @@ def runSympred5():
 				return output_data
 				break
 			else:
-				print(f'Request failed with status code {results_page.status_code}')
-				print(f'Aborting operation.')
+				print(f'Sympred: Request failed with status code {results_page.status_code}')
+				print(f'Sympred: Aborting operation.')
 				break
 		
 	else:
-		print('Unable to get job ID')
+		print('Sympred: Unable to get job ID')
 	
 def runYaspin():
 	yaspin_start_time = time.time()
@@ -638,26 +695,28 @@ def runYaspin():
 	if response.status_code == 202:
 		# Extract the job ID from the redirect URL
 		job_id = response.url.split('/')[-2]
-		print(f'Job ID: {job_id}')
+		print(f'Yaspin Job ID: {job_id}')
 		
 		# Define the URL of the job results page
 		results_url = f'http://zeus.few.vu.nl/jobs/{job_id}/results.out'
 
 		# Wait for the job to complete and the results to become available
-		print('Waiting for results...')
+		print('Yaspin: Waiting for results...')
 		
 		while True:
+			
+			# check elapsed time
+			if (time.time() - yaspin_start_time) > yaspin_timeout:
+				print(f'Yaspin timed out. Exceeded {yaspin_timeout} seconds.')
+				break
+			
 			# Send a GET request to the results page
 			results_page = requests.get(results_url)
 				
 			if results_page.status_code == 404:
-				#print(f'Request failed with status code {results_page.status_code}')
 				sleep(5)
 			elif results_page.status_code == 200:
-				#print(f'Success! status code {results_page.status_code}')
-				#print(results_page.text)
 				text_lines = results_page.text.split('\n')
-				#print(text_lines)
 				yaspin_string = ''
 				for line in text_lines:
 					if '*' in line:
@@ -674,26 +733,23 @@ def runYaspin():
 					else:
 						yaspin_out.append(letter)
 					
-				yaspin = {'YASPIN':yaspin_out}
+				yaspin = {'YASPIN': yaspin_out}
 				print(yaspin)
-				
 				
 				yaspin_end_time = time.time()
 				yaspin_execution_time = yaspin_end_time - yaspin_start_time
 				print(f'Yaspin completed in {yaspin_execution_time} sec')
-				
-				
-				
 				return yaspin
 				break
+				
 			else:
-				print(f'Request failed with status code {results_page.status_code}')
-				print(f'Aborting operation.')
+				print(f'Yaspin: Request failed with status code {results_page.status_code}')
+				print(f'Yaspin: Aborting operation.')
 				return None
 				break
 		
 	else:
-		print('Unable to get job ID')
+		print('Yaspin: Unable to get job ID')
 		return None
 		
 def process_data(data_list):
@@ -741,10 +797,36 @@ def process_data(data_list):
 		counts_list.append(C_COUNT)
 		counts_list.append(T_COUNT)
 		
+		total_counts = 0
+		for count in counts_list:
+			total_counts += count
+
+		E_perc = round(Decimal(str(E_COUNT / total_counts * 100)), 2)
+		H_perc = round(Decimal(str(H_COUNT / total_counts * 100)), 2)
+		C_perc = round(Decimal(str(C_COUNT / total_counts * 100)), 2)
+		T_perc = round(Decimal(str(T_COUNT / total_counts * 100)), 2)
+		
 		n1 = max(counts_list)
 		
 		vkabat = k * N / n1
-		return vkabat
+		
+		calc_dict = {
+						'E_COUNT': E_COUNT, 
+						'H_COUNT': H_COUNT, 
+						'C_COUNT': C_COUNT, 
+						'T_COUNT': T_COUNT, 
+						'total_counts': total_counts,
+						'E_perc': E_perc,
+						'H_perc': H_perc,
+						'C_perc': C_perc,
+						'T_perc': T_perc,
+						'k': k,
+						'N': N,
+						'n1': n1,
+						'vkabat':vkabat
+						} 
+		
+		return calc_dict
 		
 	i = 0
 	list_2d = []
@@ -755,25 +837,102 @@ def process_data(data_list):
 		list_2d.append(list_1d)
 		i += 1
 		
+	E_COUNT_list = []
+	H_COUNT_list = []
+	C_COUNT_list = []
+	T_COUNT_list = []
+	total_counts_list = []
+	E_perc_list = []
+	H_perc_list = []
+	C_perc_list = []
+	T_perc_list = []
+	k_list = []
+	N_list = []
+	n1_list = []
 	vkabat_list = []
 	for each in list_2d:
-		vkabat_list.append(calc_vkabat(each))
+		E_COUNT_list.append(calc_vkabat(each)['E_COUNT'])
+		H_COUNT_list.append(calc_vkabat(each)['H_COUNT'])
+		C_COUNT_list.append(calc_vkabat(each)['C_COUNT'])
+		T_COUNT_list.append(calc_vkabat(each)['T_COUNT'])
+		total_counts_list.append(calc_vkabat(each)['total_counts'])
+		E_perc_list.append(calc_vkabat(each)['E_perc'])
+		H_perc_list.append(calc_vkabat(each)['H_perc'])
+		C_perc_list.append(calc_vkabat(each)['C_perc'])
+		T_perc_list.append(calc_vkabat(each)['T_perc'])
+		k_list.append(calc_vkabat(each)['k'])
+		N_list.append(calc_vkabat(each)['N'])
+		n1_list.append(calc_vkabat(each)['n1'])
+		vkabat_list.append(calc_vkabat(each)['vkabat'])
 	
-	vkabat_dict = {'vkabat': vkabat_list}
+	vkabat_out_dict = {
+						'E_COUNT': E_COUNT_list, 
+						'H_COUNT': H_COUNT_list, 
+						'C_COUNT': C_COUNT_list, 
+						'T_COUNT': T_COUNT_list, 
+						'total_counts': total_counts_list,
+						'E_perc': E_perc_list,
+						'H_perc': H_perc_list,
+						'C_perc': C_perc_list,
+						'T_perc': T_perc_list,
+						'k': k_list,
+						'N': N_list,
+						'n1': n1_list,
+						'vkabat': vkabat_list
+						}
 	
-	print(vkabat_dict)
+	print(f'vkabat: {vkabat_out_dict["vkabat"]}')
 	
-	all_algos_dict.update(vkabat_dict)
+	all_algos_dict.update(vkabat_out_dict)
 	df = pd.DataFrame(data=all_algos_dict)
 	
+	print('')
 	print(df)
+	print('')
+	
+	# Write DataFrame csv file
+	vkabat_dataframe_file_name = str(seq_name) + '_vkabat_dataframe.csv'
+	vkabat_dataframe_file_name_path = os.path.join(output_directory, vkabat_dataframe_file_name)
+	print(f'Writing vkabat (data frame) csv file {vkabat_dataframe_file_name_path}')
+	df.to_csv(vkabat_dataframe_file_name_path)
+	
+	# Write vkabat csv file
+	vkabat_only_file_name = str(seq_name) + '_vkabat.csv'
+	vkabat_only_file_name_path = os.path.join(output_directory, vkabat_only_file_name)
+	print(f'Writing vkabat (only) csv file {vkabat_only_file_name_path}')
+	df2 = pd.DataFrame(data={'vkabat': vkabat_out_dict["vkabat"]})
+	df2.to_csv(vkabat_only_file_name_path, index=False)
+	
 	
 	pd_end = time.time()
 	print(f'Processing Data completed in {pd_end - pd_start} seconds')
 	
-	return vkabat_dict
+	return vkabat_out_dict
 	
+def print_banner():
+	print('\n                                 ')
+	print('   R   U   N   N   I   N   G   :	  ')
+	print('   _   _   _   _   _   _   _   _   ')
+	print('  / \ / \ / \ / \ / \ / \ / \ / \  ')
+	print(' ( P | y | V | k | a | b | a | t ) ')
+	print('  \_/ \_/ \_/ \_/ \_/ \_/ \_/ \_/  ')
+	print('   Version: 0.0.1                  ')
+	print('                                   ')
+	print('   Code available at: "https://github.com/1000000000000000000000000000000/PyVkabat"\n\n')
+
 def main():
+	
+	# start clock
+	prog_start_time = time.time()
+	
+	# print banner
+	print_banner()
+	
+	# argparse code
+	parse_arguments()
+
+	# supress irrelevant warnings in bs4
+	warnings.filterwarnings("ignore", category=UserWarning, module='bs4')
 	
 	with concurrent.futures.ThreadPoolExecutor() as executor:
 		prabi_future = executor.submit(runPrabi)
@@ -788,8 +947,19 @@ def main():
     
 	print(f'Total elapsed time to retrieve data: {time.time() - prog_start_time} seconds\n')
 	
-	data_list = [prabi_output, yaspin_output, jpred_output, sympred_output]
-	process_data(data_list)
+	algo_list = [prabi_output, yaspin_output, jpred_output, sympred_output]
+	successful_algo_list = []
+	failed_algo_list = []
+	for algo in algo_list:
+		if algo == None:
+			continue
+		else:
+			successful_algo_list.append(algo)
+	
+	process_data(successful_algo_list)
+	
+	print(f'Total running time: {time.time() - prog_start_time} seconds.')
+	print('Done.')
 	
 if __name__ == '__main__':
 	main()

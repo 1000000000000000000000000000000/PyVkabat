@@ -48,7 +48,7 @@ Next, enter the following:
 conda activate PyVkabat
 ```
 
-Now, enter the following (make sure you are in the directory where libversions.txt is located):
+Now, enter the following (make sure you are in the directory where pyvkabat_requirements.txt is located):
 ```
 pip install -r pyvkabat_requirements.txt
 ```

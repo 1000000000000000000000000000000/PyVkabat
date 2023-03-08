@@ -68,5 +68,5 @@ cd <PATH TO PROJECT FOLDER>
 
 Now that you are in the project folder, enter the following command:
 ```
-conda activate uplc_batch_helper && python ./PyVkabat.py
+conda activate PyVkabat && python ./PyVkabat.py
 ```

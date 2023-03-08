@@ -1,5 +1,5 @@
 # PyVkabat
-PyVkabat is a bioinformatics/computational chemistry tool used to calculated secondary structure variability at each residue position in a protein of interest.
+PyVkabat is a bioinformatics/computational chemistry tool used to calculated secondary structure variability at each residue position in a protein of interest. To reduce run time, each of the requests are made in parallel.
 
 <br>
 Vkabat = k * N / n1

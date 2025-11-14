@@ -692,7 +692,9 @@ def runYaspin():
 	payload += '--' + boundary + '--\r\n'
 
 	# Define the URL of the Yaspin web form
-	url = 'https://www.ibi.vu.nl/programs/yaspinwww/'
+	url = 'https://www.ibi.vu.nl/programs/yaspinwww/' # When entering this address, it says not to bookmark and to use www.ibi.vu.nl/programs/yaspinwww/ or www.ibi.vu.nl/programs/ as stable alternatives!
+	#url = 'www.ibi.vu.nl/programs/yaspinwww/'
+	#url = ' www.ibi.vu.nl/programs/'
 
 	# Submit the form data using a POST request
 	response = requests.post(url, headers=headers, data=payload, allow_redirects=True)

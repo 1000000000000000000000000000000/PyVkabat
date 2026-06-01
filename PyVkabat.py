@@ -58,14 +58,37 @@ check_jpred_status = int(60) # Number of minutes to keep checking the status bef
 
 #############################################################################
 
+def read_sequence_from_fasta(fasta_path):
+	sequence_lines = []
+
+	with open(fasta_path, 'r') as fasta_file:
+		for line in fasta_file:
+			line = line.strip()
+
+			if not line:
+				continue
+
+			if line.startswith('>'):
+				continue
+
+			sequence_lines.append(line)
+
+	sequence_from_fasta = ''.join(sequence_lines).replace(' ', '').replace('\t', '').upper()
+
+	if sequence_from_fasta == '':
+		raise ValueError(f'No sequence was found in FASTA file: {fasta_path}')
+
+	return sequence_from_fasta
+
 def parse_arguments():
 
 	parser = argparse.ArgumentParser(description='Calculates secondary structure variability (vkabat = k * N / n1) for each resiue in a protein sequence.')
 
 	# positional arguments
-	parser.add_argument('sequence', metavar='<sequence>', type=str, help='Enter sequence (using 1 letter amino acid abbreviations)')
+	parser.add_argument('sequence', metavar='<sequence>', type=str, nargs='?', help='Enter sequence (using 1 letter amino acid abbreviations). Optional if --fasta is provided.')
 
 	# optional arguments
+	parser.add_argument('--fasta', metavar='<fasta file path>', type=str, help='Enter the path to a FASTA file. If provided, the sequence will be extracted from this file instead of the positional sequence argument.')
 	parser.add_argument('--name', metavar='<protein name>', type=str, help='Enter the name of the protein sequence or job name. This is a way to keep track of the submission and will affect the csv file names deposited in the project folder.')
 	parser.add_argument('--dir', metavar='<output directory path>', type=str, help='Enter the path to the output directory. This is where the output files will be sent.')
 	parser.add_argument('--email', metavar='<email>', type=str, help='Enter your email. Some servers will email you the results.')
@@ -85,7 +108,13 @@ def parse_arguments():
 
 	# sequence
 	global sequence
-	sequence = args.sequence
+	if args.fasta != None:
+		sequence = read_sequence_from_fasta(args.fasta)
+		print(f'Input FASTA file: {args.fasta}')
+	elif args.sequence != None:
+		sequence = args.sequence.replace(' ', '').replace('\t', '').replace('\n', '').upper()
+	else:
+		parser.error('A sequence positional argument or --fasta file must be provided.')
 	print(f'Input Sequence: {sequence}')
 	print(f'Sequence length: {len(sequence)}')
 
